@@ -1,0 +1,13 @@
+@font-face {
+  font-family: '${1}';
+  /* src引入需要精简的ttf字体文件 */
+  src: url('./${0}') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+body {
+  font-family: "${1}";
+}
+.ttf {
+  font-family: '${1}';
+}

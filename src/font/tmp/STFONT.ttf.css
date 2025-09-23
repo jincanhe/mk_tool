@@ -1,0 +1,13 @@
+@font-face {
+  font-family: 'STFONT';
+  /* src引入需要精简的ttf字体文件 */
+  src: url('./STFONT.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+body {
+  font-family: "STFONT";
+}
+.ttf {
+  font-family: 'STFONT';
+}
