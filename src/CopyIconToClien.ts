@@ -7,10 +7,10 @@ import * as path from "path";
 import * as fs from "fs";
 import { exec } from "child_process";
 import * as readline from "readline";
-import * as iconv from 'iconv-lite';
+// import * as iconv from 'iconv-lite';
 import { spawn } from "child_process";
-
 import { ClientArgsHelper } from "./help/ClientArgsHelper";
+
 
 interface ClientData {
     clientPath: string;
@@ -57,7 +57,7 @@ export class CopyIconToClient {
 
         this.svnUpdatePath.push(artPathSuffix + "/导出/UI");
         this.svnUpdatePath.push(clientPathSuffix + "/client/ext-res/shuzhi");
-        this.svnUpdatePath.push(clientPathSuffix + "/client/assets/bundles/module/activity/ui/entrance");
+        this.svnUpdatePath.push(clientPathSuffix + "/client/assets/bundles/module");
 
         //ui目录对应的客户端文件夹
         this.ui_client_pathMap.set(artPathSuffix + "/导出/UI/通用资源/icon", [
@@ -183,21 +183,22 @@ export class CopyIconToClient {
         console.log(ClientArgsHelper.args)
         this._init();
 
-        //用gbk 编码 exec svn中文才不乱码。。
-        const ps = spawn('powershell.exe', [
-            '-Command',
-            '[console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(936)'
-        ]);
+        this._svnup();
+        //windows用gbk 编码 exec svn中文才不乱码。。
+        // const ps = spawn('powershell.exe', [
+        //     '-Command',
+        //     '[console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(936)'
+        // ]);
 
-        ps.on('close', (code) => {
-            console.log(`PowerShell编码设置[console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(936)\n`);
-            this._svnup();
-        });
+        // ps.on('close', (code) => {
+        //     console.log(`PowerShell编码设置[console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(936)\n`);
+        //     this._svnup();
+        // });
 
-        ps.on('error', (error) => {
-            console.error(`PowerShell执行错误: ${error}`);
-            this._svnup();
-        });
+        // ps.on('error', (error) => {
+        //     console.error(`PowerShell执行错误: ${error}`);
+        //     this._svnup();
+        // });
     }
 
     private _svnup() {
@@ -212,13 +213,13 @@ export class CopyIconToClient {
             }
 
             // 将GBK编码的buffer转换为UTF-8字符串
-            const output = iconv.decode(stdout as Buffer, 'gbk');
-            const errorOutput = stderr ? iconv.decode(stderr as Buffer, 'gbk') : '';
+            // const output = iconv.decode(stdout as Buffer, 'gbk');
+            // const errorOutput = stderr ? iconv.decode(stderr as Buffer, 'gbk') : '';
 
-            console.log(`命令输出: ${output}`);
-            if (errorOutput) {
-                console.error(`命令错误: ${errorOutput}`);
-            }
+            console.log(`命令输出: ${stdout}`);
+            // if (errorOutput) {
+            //     console.error(`命令错误: ${errorOutput}`);
+            // }
 
             if (this.svnUpdatePath.length > 0) {
                 this._svnup();
@@ -329,8 +330,57 @@ export class CopyIconToClient {
 
         console.log('合计：' + '[' + totalCount + '] 个资源')
 
-        // 在检查完成后询问用户是否要提交SVN
-        this.askForSvnCommit();
+        this.updateDb()
+    }
+
+    private updateDb() {
+        let paths = ClientArgsHelper.updateDb_config
+        let updateDbCount = 0;
+        for (let p of paths) {
+            exec(`curl ${p}`, (error, stdout, stderr) => {
+                console.log("执行编译命令: " + p);
+                updateDbCount++;
+                if (updateDbCount == paths.length) {
+                    console.log(`等待编译生效 10s (按Enter跳过)...`);
+                    const rl = readline.createInterface({
+                        input: process.stdin,
+                        output: process.stdout
+                    });
+
+                    let time = 0;
+                    const totalTime = 10000;
+                    const intervalTime = 100;
+                    let isFinished = false;
+
+                    const timer = setInterval(() => {
+                        if (isFinished) return;
+                        time += intervalTime;
+                        const progress = Math.min(1, time / totalTime);
+                        const filled = Math.floor(progress * 30);
+                        const bar = "█".repeat(filled) + "-".repeat(30 - filled);
+
+                        process.stdout.write(`\r[${bar}] ${(progress * 100).toFixed(0)}%`);
+
+                        if (time >= totalTime) {
+                            finish();
+                        }
+                    }, intervalTime);
+
+                    const finish = () => {
+                        if (isFinished) return;
+                        isFinished = true;
+                        clearInterval(timer);
+                        rl.close();
+                        console.log("\n等待结束");
+                        this.askForSvnCommit();
+                    };
+
+                    rl.on("line", () => {
+                        finish();
+                    });
+                }
+            });
+        }
     }
 
     askForSvnCommit() {
@@ -388,7 +438,7 @@ export class CopyIconToClient {
 
     executeSvnCommands(svnPath: string, callback: () => void) {
         // 先执行svn add，添加新文件
-        let addCmd = `svn add "${svnPath}\\*" --force`;
+        let addCmd = `svn add "${svnPath}" --force`;
         console.log(`执行命令: ${addCmd}`);
 
         exec(addCmd, (error, stdout, stderr) => {
@@ -429,18 +479,18 @@ export class CopyIconToClient {
     }
 
     end() {
-        const ps = spawn('powershell.exe', [
-            '-Command',
-            '[console]::OutputEncoding = [System.Text.Encoding]::UTF8'
-        ]);
+        // const ps = spawn('powershell.exe', [
+        //     '-Command',
+        //     '[console]::OutputEncoding = [System.Text.Encoding]::UTF8'
+        // ]);
 
-        ps.on('close', (code) => {
-            console.log(`\n1PowerShell编码设置[console]::OutputEncoding = [System.Text.Encoding]::UTF8`);
-        });
+        // ps.on('close', (code) => {
+        //     console.log(`\n1PowerShell编码设置[console]::OutputEncoding = [System.Text.Encoding]::UTF8`);
+        // });
 
-        ps.on('error', (error) => {
-            console.error(`PowerShell执行错误: ${error}`);
-        });
+        // ps.on('error', (error) => {
+        //     console.error(`PowerShell执行错误: ${error}`);
+        // });
     }
 }
 

@@ -1,22 +1,21 @@
+export enum OptionsEnum {
+    master = 'master',
+    master_new = 'master_new',
+    master_new_useMasterArt = 'master_new_useMasterArt',
+}
+
 export class ClientArgsHelper {
     public static args: { [key: string]: string | boolean } = {};
-    public static curBranch: string = "";
+    public static curBranch: OptionsEnum | "" = "";
 
-    private static _allowedOptions = ['mk', 'mk_new', 'h', 'new', 'new_useold'];
-    private static _clientSuffix_config: { [key: string]: string } = {
-        "mk": "../../../mk",
-        "new_useold": "../../../mk_new",
-        "mk_new": "../../../mk_new",
-        "new": "../../../mk_new"
+    private static _clientSuffix_config: { [key in OptionsEnum]: string[] } = {
+        //[clientPathSuffix, artPathSuffix]
+        [OptionsEnum.master]: ["../../master", "../../work/art"],
+        [OptionsEnum.master_new]: ["../../master_new", "../../work/art/art_调优版本"],
+        [OptionsEnum.master_new_useMasterArt]: ["../../master_new", "../../work/art"],
     }
 
-
-    private static _artSuffix_config: { [key: string]: string } = {
-        "mk": "../../work/mk/art",
-        "new_useold": "../../work/mk/art",
-        "mk_new": "../../work/mk/art/art_调优版本",
-        "new": "../../work/mk/art/art_调优版本"
-    }
+    public static updateDb_config: string[] = ["http://localhost:7456/update-db", "http://localhost:7457/update-db"];
 
     public static parseArgs() {
         const args = process.argv.slice(2);
@@ -24,33 +23,48 @@ export class ClientArgsHelper {
             const arg = args[i];
             if (arg.startsWith('--')) {
                 const key = arg.slice(2);
-                if (this._allowedOptions.indexOf(key) === -1) {
+                if (key === 'h') {
+                    this.args['h'] = true;
                     continue;
                 }
-                this.args[key] = true;
-                this.curBranch = key;
-                break
+
+                // Check if key matches any OptionsEnum value
+                if (Object.values(OptionsEnum).includes(key as OptionsEnum)) {
+                    this.args[key] = true;
+                    this.curBranch = key as OptionsEnum;
+                    break;
+                }
             }
         }
-        if (this.args['h'] || this.curBranch == "") {
+
+        if (this.args['h'] || this.curBranch === "") {
+            const optionsHelp = Object.values(OptionsEnum).map(opt => {
+                const config = this._clientSuffix_config[opt];
+                return `  --${opt.padEnd(20)} [${config.map(s => `"${s}"`).join(", ")}]`;
+            }).join('\n');
+
             console.log(`
 Usage: ts-node [Script].ts [options]
 
 Options:
-  --mk        Execute for mk
-  --new_mk    Execute for new_mk
-  --new       Execute for new
-  --h         Show this help message
+${optionsHelp}
+  --h                    Show this help message
 `);
             process.exit(0);
         }
     }
 
     public static getClientPathSuffix(): string {
-        return this._clientSuffix_config[this.curBranch];
+        if (this.curBranch === "") {
+            throw new Error("未找到分支");
+        }
+        return this._clientSuffix_config[this.curBranch][0];
     }
 
     public static getArtPathSuffix(): string {
-        return this._artSuffix_config[this.curBranch];
+        if (this.curBranch === "") {
+            throw new Error("未找到分支")
+        }
+        return this._clientSuffix_config[this.curBranch][1];
     }
 }
